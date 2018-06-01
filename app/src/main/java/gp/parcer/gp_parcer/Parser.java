@@ -1,17 +1,11 @@
 package gp.parcer.gp_parcer;
 
-import android.util.Log;
-
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Random;
 
 public class Parser {
@@ -22,9 +16,10 @@ public class Parser {
 
     private String startingUrl;
 
+    private boolean isStopped = false;
+
     public interface ParcerCallback {
-        void onProgressChanged(int size);
-        void onWorkDone();
+        void onProgressChanged(long size);
     }
 
     public Parser(String startingUrl, ParcerCallback callback) {
@@ -37,12 +32,16 @@ public class Parser {
 
         try {
             doc = Jsoup.connect(url).userAgent("Mozilla/5.0 (Windows; U; WindowsNT 5.1; en-US; rv1.8.1.6) Gecko/20070725 Firefox/2.0.0.6")
-                    .maxBodySize(1024*1024*1) // Size in Bytes - 10 MB
+                    .maxBodySize(1024 * 1024 * 1) // Size in Bytes - 10 MB
                     .referrer("http://www.google.com").get();
         } catch (IOException e) {
         }
 
         return doc;
+    }
+
+    public void stop(){
+        isStopped = true;
     }
 
     public void parse() {
@@ -55,9 +54,13 @@ public class Parser {
     }
 
     public boolean parsePrivate(String url) {
+        if (isStopped){
+            return true;
+        }
+
         Document doc = getDocument(url);
 
-        if (doc == null){
+        if (doc == null) {
             return false;
         }
 
@@ -79,17 +82,12 @@ public class Parser {
 
         parceAppPage(href);
 
-        int size = ModelHolder.getModels().size();
+        long size = ModelHolder.getSize();
+        callback.onProgressChanged(size);
 
-        if (size < Constants.NEEDED_EMAILS) {
-            callback.onProgressChanged(size);
-
-            boolean has = parsePrivate(href);
-            if (!has) {
-                parsePrivate(url);
-            }
-        } else {
-            callback.onWorkDone();
+        boolean has = parsePrivate(href);
+        if (!has) {
+            parsePrivate(url);
         }
 
         return true;
@@ -118,11 +116,11 @@ public class Parser {
             }
         }
 
-        if (model.email == null){
+        if (model.email == null) {
             return;
         }
 
-        if (ModelHolder.getModels().containsKey(model.email)){
+        if (ModelHolder.contains(model.email)) {
             return;
         }
 
@@ -161,14 +159,11 @@ public class Parser {
         }
 
         if (model.email != null) {
-            ModelHolder.getModels().put(model.email, model);
+            ModelHolder.add(model);
         }
 
     }
 }
-
-
-
 
 
 //    private Document getAppsDocument1(String url) {
