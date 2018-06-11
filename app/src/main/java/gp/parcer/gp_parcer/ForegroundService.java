@@ -11,7 +11,6 @@ import android.graphics.BitmapFactory;
 import android.os.Binder;
 import android.os.IBinder;
 import android.support.v4.app.NotificationCompat;
-import android.util.Log;
 
 import org.greenrobot.eventbus.EventBus;
 
@@ -21,6 +20,8 @@ import java.util.List;
 import gp.parcer.events.ParseEvent;
 import gp.parcer.events.ParseStartedEvent;
 import gp.parcer.events.ParseStoppedEvent;
+import gp.parcer.gp_parcer.parsers.BaseParser;
+import gp.parcer.gp_parcer.parsers.Parser;
 
 public class ForegroundService extends Service {
 
@@ -33,7 +34,7 @@ public class ForegroundService extends Service {
 
     private final IBinder mBinder = new LocalBinder();
 
-    private List<Parser> parsers;
+    private List<BaseParser> parsers;
 
     private int parcerCount = 6;
 
@@ -91,7 +92,7 @@ public class ForegroundService extends Service {
     }
 
     private void stopParceJob(){
-        for (Parser parser : parsers) {
+        for (BaseParser parser : parsers) {
             parser.stop();
         }
     }

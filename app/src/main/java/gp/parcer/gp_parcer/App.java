@@ -20,7 +20,7 @@ public class App extends Application {
     }
 
     private static void initGreenDao(){
-        DaoMaster.OpenHelper helper = new DaoMaster.DevOpenHelper(appContext, "serverconfigurations-db");
+        DaoMaster.OpenHelper helper = new DatabaseUpgradeHelper(appContext, "serverconfigurations-db");
         Database db = helper.getWritableDb();
         daoSession = new DaoMaster(db).newSession();
     }

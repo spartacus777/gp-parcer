@@ -17,13 +17,17 @@ public class Model {
 
     public String publisher;
 
+    public String category;
+
     public float rating;
 
-@Generated(hash = 626044508)
-public Model(String email, String appName, String publisher, float rating) {
+@Generated(hash = 2100533769)
+public Model(String email, String appName, String publisher, String category,
+        float rating) {
     this.email = email;
     this.appName = appName;
     this.publisher = publisher;
+    this.category = category;
     this.rating = rating;
 }
 
@@ -72,5 +76,13 @@ public float getRating() {
 
 public void setRating(float rating) {
     this.rating = rating;
+}
+
+public String getCategory() {
+    return this.category;
+}
+
+public void setCategory(String category) {
+    this.category = category;
 }
 }

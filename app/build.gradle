@@ -3,6 +3,9 @@ apply plugin: 'org.greenrobot.greendao'
 
 def final GREEN_DAO_VER = '3.2.0'
 
+greendao {
+    schemaVersion 2
+}
 
 android {
     compileSdkVersion 27
