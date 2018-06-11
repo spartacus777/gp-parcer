@@ -28,4 +28,8 @@ public class App extends Application {
     public static DaoSession getDaoSession(){
         return daoSession;
     }
+
+    public static Context getContext(){
+        return appContext;
+    }
 }

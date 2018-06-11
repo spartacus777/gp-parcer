@@ -1,12 +1,15 @@
 package gp.parcer.gp_parcer;
 
 import android.Manifest;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Environment;
+import android.os.IBinder;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
@@ -19,6 +22,10 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -26,6 +33,10 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+
+import gp.parcer.events.ParseEvent;
+import gp.parcer.events.ParseStartedEvent;
+import gp.parcer.events.ParseStoppedEvent;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -41,23 +52,8 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean onWorkDone = false;
 
-    private boolean isWorking = false;
-
-    private int parcerCount = 6;
-
-    private List<Parser> parsers;
-
-    private Parser.ParcerCallback callback = new Parser.ParcerCallback() {
-        @Override
-        public void onProgressChanged(final long size) {
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    tvResult.setText("Items: " + size);
-                }
-            });
-        }
-    };
+    private boolean mBound = false;
+    private ForegroundService mService;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -93,70 +89,98 @@ public class MainActivity extends AppCompatActivity {
         });
 
         tvResult.setText("Items: " + ModelHolder.getSize());
-        initStartBtn(false);
     }
 
-    private void initStartBtn(boolean isRunning) {
-        if (isRunning) {
-            ivStartStop.setImageDrawable(pause);
-            pb.setVisibility(View.VISIBLE);
-            tvStatus.setText("Is running..");
+    private void initStartBtn() {
+        if (mService != null) {
+            if (mService.isRunning()) {
+                ivStartStop.setImageDrawable(pause);
+                pb.setVisibility(View.VISIBLE);
+                tvStatus.setText("Is running..");
 
-            tvLogAsLogs.setVisibility(View.GONE);
-            tvDownloadAsFile.setVisibility(View.GONE);
-        } else {
-            ivStartStop.setImageDrawable(play);
-            pb.setVisibility(View.GONE);
-            tvStatus.setText("Not running");
+                tvLogAsLogs.setVisibility(View.GONE);
+                tvDownloadAsFile.setVisibility(View.GONE);
+            } else {
+                ivStartStop.setImageDrawable(play);
+                pb.setVisibility(View.GONE);
+                tvStatus.setText("Not running");
 
-            tvLogAsLogs.setVisibility(View.VISIBLE);
-            tvDownloadAsFile.setVisibility(View.VISIBLE);
+                tvLogAsLogs.setVisibility(View.VISIBLE);
+                tvDownloadAsFile.setVisibility(View.VISIBLE);
+            }
         }
     }
 
     private void onStartStopClicked() {
-        if (!isWorking) {
-            startParceJob();
-        } else {
-            for (Parser parser : parsers) {
-                parser.stop();
+        if (mService != null) {
+            if (mService.isRunning()) {
+                Intent service = ForegroundService.createIntent(ForegroundService.ACTION_STOP_MINING);
+                App.getContext().startService(service);
+
+            } else {
+                Intent service = ForegroundService.createIntent(ForegroundService.ACTION_START_MINING);
+                App.getContext().startService(service);
             }
         }
 
-        isWorking = !isWorking;
-
-        initStartBtn(isWorking);
+        initStartBtn();
     }
 
-    private void startParceJob() {
-        ModelHolder.init();
-
-        parsers = new ArrayList<>(parcerCount);
-
-        Parser parser1 = new Parser(Constants.URL1, callback);
-        parser1.parse();
-        parsers.add(parser1);
-
-        Parser parser2 = new Parser(Constants.URL2, callback);
-        parser2.parse();
-        parsers.add(parser2);
-
-        Parser parser3 = new Parser(Constants.URL3, callback);
-        parser3.parse();
-        parsers.add(parser3);
-
-        Parser parser4 = new Parser(Constants.URL4, callback);
-        parser4.parse();
-        parsers.add(parser4);
-
-        Parser parser5 = new Parser(Constants.URL5, callback);
-        parser5.parse();
-        parsers.add(parser5);
-
-        Parser parser6 = new Parser(Constants.URL6, callback);
-        parser6.parse();
-        parsers.add(parser6);
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onMessageEvent(ParseEvent event) {
+        tvResult.setText("Items: " + event.elements);
     }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onMessageEvent(ParseStartedEvent event) {
+        initStartBtn();
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onMessageEvent(ParseStoppedEvent event) {
+        initStartBtn();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        EventBus.getDefault().register(this);
+        // Bind to LocalService
+        Intent intent = new Intent(this, ForegroundService.class);
+        bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
+
+        if (mService != null) {
+            initStartBtn();
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        EventBus.getDefault().unregister(this);
+        unbindService(mConnection);
+        mBound = false;
+    }
+
+    private ServiceConnection mConnection = new ServiceConnection() {
+
+        @Override
+        public void onServiceConnected(ComponentName className,
+                                       IBinder service) {
+            // We've bound to LocalService, cast the IBinder and get LocalService instance
+            ForegroundService.LocalBinder binder = (ForegroundService.LocalBinder) service;
+            mService = binder.getService();
+            mBound = true;
+
+            initStartBtn();
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName arg0) {
+            mBound = false;
+        }
+    };
+
 
     private boolean hasPermission() {
         if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
